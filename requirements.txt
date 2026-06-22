@@ -1,0 +1,5 @@
+flask
+pymupdf
+fpdf2
+python-docx
+openai

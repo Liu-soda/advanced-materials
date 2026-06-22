@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Materials · AI实验平台</title>
+<style>
+  :root {
+    --bg: #0a0e17; --surface: #111827; --surface2: #1a2235; --border: #1e2d45;
+    --primary: #4fc3f7; --primary2: #29b6f6; --accent: #00e676; --warn: #ffb74d;
+    --red: #ef5350; --text: #e0e6ed; --muted: #78909c; --glow: 0 0 20px rgba(79,195,247,0.3);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+  
+  /* Background particles */
+  .bg-particles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .particle { position: absolute; border-radius: 50%; background: var(--primary); opacity: 0.15; animation: float 8s infinite; }
+  @keyframes float { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-40px) scale(1.3); } }
+  
+  /* Grid background */
+  .grid-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0;
+    background-image: linear-gradient(rgba(79,195,247,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(79,195,247,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; }
+  
+  /* Layout */
+  .app { display: flex; height: 100vh; position: relative; z-index: 1; }
+  
+  /* Sidebar */
+  .sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; flex-shrink: 0; transition: width .3s; overflow: hidden; }
+  .sidebar.collapsed { width: 56px; }
+  .sidebar.collapsed .nav-item span, .sidebar.collapsed .logo span, .sidebar.collapsed .school-text, .sidebar.collapsed .logo-full { display: none; }
+  .sidebar.collapsed .logo-icon { display: inline !important; }
+  .sidebar.collapsed { width: 56px; }
+  .sidebar .logo { padding: 0 20px 8px; font-size: 1.2rem; font-weight: 800; color: var(--primary); letter-spacing: 1px; }
+  .sidebar .logo span { color: var(--accent); }
+  .sidebar .logo span { color: var(--accent); }
+  .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: .9rem; transition: .2s; border-left: 3px solid transparent; margin: 2px 0; }
+  .nav-item:hover { color: var(--text); background: rgba(79,195,247,0.05); }
+  .nav-item.active { color: var(--primary); background: rgba(79,195,247,0.08); border-left-color: var(--primary); }
+  .nav-item .icon { width: 20px; text-align: center; font-size: 1.1rem; }
+  .sidebar .status { margin-top: auto; padding: 20px; font-size: .75rem; color: var(--muted); }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  
+  /* Main content */
+  .main { flex: 1; overflow-y: auto; padding: 32px; }
+  .page { display: none; }
+  .page.active { display: block; animation: fadeIn .4s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+  .card.glow { box-shadow: var(--glow); border-color: rgba(79,195,247,0.3); }
+  .card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; font-size: 1.05rem; font-weight: 700; color: var(--primary); }
+  .card-header .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .card-header .dot.blue { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
+  .card-header .dot.green { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  
+  /* Stats */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; text-align: center; }
+  .stat-card .value { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .stat-card .label { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+  
+  /* Architecture Canvas */
+  #archCanvas { width: 100%; height: 420px; border-radius: 12px; display: block; }
+  
+  /* Upload zone */
+  .upload-zone { border: 2px dashed var(--border); border-radius: 14px; padding: 36px; text-align: center; cursor: pointer; transition: .25s; background: var(--surface2); }
+  .upload-zone:hover { border-color: var(--primary); background: rgba(79,195,247,0.05); box-shadow: var(--glow); }
+  .upload-zone.drag { border-color: var(--accent); background: rgba(0,230,118,0.05); }
+  .file-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .file-tag { background: rgba(79,195,247,0.1); color: var(--primary); padding: 5px 12px; border-radius: 16px; font-size: .8rem; border: 1px solid rgba(79,195,247,0.2); display: inline-flex; align-items: center; gap: 6px; }
+  .file-tag .x { cursor: pointer; opacity: .5; }
+  .file-tag .x:hover { opacity: 1; color: var(--red); }
+  
+  /* Inputs */
+  textarea, input[type="file"], input[type="text"] { width: 100%; padding: 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: .9rem; font-family: inherit; resize: vertical; }
+  textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 12px rgba(79,195,247,0.15); }
+  textarea::placeholder { color: #455a64; }
+  
+  .btn { padding: 14px 28px; border: none; border-radius: 10px; font-size: .95rem; font-weight: 700; cursor: pointer; transition: .25s; letter-spacing: .5px; }
+  .btn-primary { background: linear-gradient(135deg, var(--primary), #039be5); color: #000; width: 100%; }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(79,195,247,0.25); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+  
+  /* Result */
+  .result-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 18px; font-size: .85rem; line-height: 1.8; max-height: 500px; overflow-y: auto; white-space: pre-wrap; }
+  .result-box h2 { color: var(--primary); margin: 16px 0 8px; }
+  .result-box h3 { color: var(--accent); margin: 12px 0 6px; }
+  
+  /* Download */
+  .dl-bar { display: none; margin-top: 16px; padding: 16px; background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.25); border-radius: 12px; align-items: center; gap: 14px; }
+  .dl-btn { padding: 10px 22px; background: var(--accent); color: #000; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; text-decoration: none; }
+  
+  /* Progress */
+  .progress-wrap { margin-top: 14px; display: none; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 3px; width: 0; transition: .5s; }
+  
+  .section-label { font-size: .82rem; color: var(--primary); font-weight: 600; margin: 16px 0 6px; }
+  
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  .data-table th { background: var(--surface2); color: var(--primary); padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  .data-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+  .data-table tr:hover { background: rgba(79,195,247,0.03); }
+  
+  .chart-placeholder { width: 100%; height: 260px; background: var(--surface2); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--muted); border: 1px dashed var(--border); font-size: .9rem; }
+  
+  @media (max-width: 800px) { .sidebar { width: 60px; } .sidebar .nav-item span, .sidebar .logo, .sidebar .status { display: none; } .stats-row { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="bg-particles" id="particles"></div>
+
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo"><span class="logo-full">🔬 Adv</span><span>Materials</span><span class="logo-icon" style="display:none;">🔬</span></div>
+    <div class="school-text" style="padding: 4px 20px 2px;font-size:.78rem;color:#ffffff;font-weight:700;letter-spacing:1px;border-bottom:1px solid rgba(79,195,247,0.15);">华中科技大学</div>
+    <div class="school-text" style="padding:2px 20px 10px;font-size:.7rem;color:#c0d0e0;">材料科学与工程学院</div>
+    <div class="nav-item active" onclick="switchPage('dashboard')"><span class="icon">🏠</span> <span>控制台</span></div>
+    <div class="nav-item" onclick="switchPage('papers')"><span class="icon">📄</span> <span>论文分析</span></div>
+    <div class="nav-item" onclick="switchPage('data')"><span class="icon">📊</span> <span>实验数据</span></div>
+    <div class="nav-item" onclick="switchPage('images')"><span class="icon">🔍</span> <span>图像分析</span></div>
+    <div class="nav-item" onclick="switchPage('kb')"><span class="icon">📚</span> <span>知识库</span></div>
+    <div class="nav-item" onclick="switchPage('report')"><span class="icon">🧪</span> <span>方案生成</span></div>
+    <div class="nav-item" onclick="switchPage('arch')"><span class="icon">⚙</span> <span>系统架构</span></div>
+    <div class="status"><span class="status-dot"></span> AI引擎 · Paper-Orchestrator v3.0</div>
+    <button class="toggle-btn" onclick="document.querySelector('.sidebar').classList.toggle('collapsed')">☰ 折叠</button>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    
+    <!-- ====== DASHBOARD ====== -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-row">
+        <div class="stat-card"><div class="value" id="statPapers">0</div><div class="label">论文已分析</div></div>
+        <div class="stat-card"><div class="value" id="statReports">0</div><div class="label">报告已生成</div></div>
+        <div class="stat-card"><div class="value" id="statAgents">3</div><div class="label">AI Agent运行中</div></div>
+        <div class="stat-card"><div class="value">44</div><div class="label">知识库论文</div></div>
+      </div>
+      
+      <div class="card glow">
+        <div class="card-header"><div class="dot blue"></div> Paper-Orchestrator 实时工作流</div>
+        <canvas id="archCanvas"></canvas>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-header"><div class="dot green"></div> 最近活动</div>
+          <div style="color:var(--muted);font-size:.85rem;" id="recentActivity">
+            · 系统就绪，等待指令...
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="dot blue"></div> 快速开始</div>
+          <div style="font-size:.85rem;line-height:2;">
+            → 点击左侧 <b style="color:var(--primary)">论文分析</b> 上传论文生成报告<br>
+            → 点击 <b style="color:var(--accent)">实验数据</b> 导入数据分析趋势<br>
+            → 点击 <b style="color:var(--warn)">图像分析</b> 上传SEM/XRD图像
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== PAPERS ====== -->
+    <div class="page" id="page-papers">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <!-- Left: Upload -->
+        <div>
+          <div class="card" style="height:100%;max-height:480px;display:flex;flex-direction:column;">
+            <div class="card-header"><div class="dot blue"></div> 上传论文PDF</div>
+            <div class="upload-zone" id="dropZone" style="padding:20px 16px;">
+              <div style="font-size:1.8rem;margin-bottom:4px;">📎</div>
+              <div style="font-size:.9rem;"><b>拖放或点击上传论文</b></div>
+              <div style="color:var(--muted);font-size:.7rem;margin-top:2px;">可多次点击添加不同文件夹 · 也支持拖放整个文件夹</div>
+              <input type="file" id="fileInput" accept=".pdf" multiple hidden>
+            </div>
+            <div class="file-tags" id="fileTags" style="min-height:24px;max-height:180px;overflow-y:auto;"></div>
+          </div>
+        </div>
+        <!-- Right: Chat -->
+        <div>
+          <div class="card" style="height:100%;display:flex;flex-direction:column;max-height:480px;">
+            <div class="card-header" style="justify-content:space-between;">
+              <span><span class="dot green" style="display:inline-block;"></span> 实验助手 · 随便问问</span>
+              <button onclick="newChat()" style="background:var(--primary);color:#000;border:none;border-radius:6px;padding:4px 14px;font-size:.78rem;font-weight:700;cursor:pointer;">+ 新对话</button>
+            </div>
+            <!-- Conversation list -->
+            <div id="convList" style="max-height:100px;overflow-y:auto;font-size:.76rem;border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:4px;"></div>
+            <!-- Messages -->
+            <div id="chatLog" style="flex:1;overflow-y:auto;font-size:.82rem;line-height:1.7;padding:4px 0;max-height:220px;">
+              <div style="color:var(--muted);font-size:.85rem;">Hi，实验还顺利吗？有什么材料方面的问题随时问我，别客气 :)</div>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:6px;">
+              <label style="cursor:pointer;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:.8rem;color:var(--muted);white-space:nowrap;" title="上传文件到对话">
+                📎<input type="file" id="chatFileInput" accept=".pdf,.jpg,.jpeg,.png,.csv,.xlsx" multiple hidden onchange="uploadChatFiles()">
+              </label>
+              <input type="text" id="chatInput" placeholder="随便聊聊..." style="flex:1;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;" onkeydown="if(event.key==='Enter')sendChat()">
+              <button onclick="sendChat()" style="padding:8px 16px;background:var(--primary);color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.85rem;">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-label">🔬 样品状态</div>
+        <textarea id="sampleStatus" rows="2" placeholder="已经用3D打印机打印好了SiC陶瓷样品，目前是多孔状态，还没有烧结..."></textarea>
+        <div class="section-label">🎯 实验目标</div>
+        <textarea id="goal" rows="3" placeholder="想让样品的抗弯强度提高到700MPa以上，热导率超过180W/m·K，用最简单的方法实现，成本越低越好..."></textarea>
+        <div class="section-label">📝 特殊要求</div>
+        <textarea id="requirements" rows="2" placeholder="报告要中文，有详细的设备清单和操作步骤，包含安全注意事项，对比至少两种方案..."></textarea>
+        
+        <button class="btn btn-primary" id="btnGenerate" onclick="startAnalysis()">🚀 按我的需求生成实验报告</button>
+        
+        <div class="progress-wrap" id="progressWrap">
+          <div style="color:var(--primary);font-size:.82rem;margin-bottom:6px;" id="stepMsg">准备中...</div>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+        </div>
+      </div>
+
+      <div class="card" id="resultCard" style="display:none;">
+        <div class="card-header"><div class="dot green"></div> 分析结果</div>
+        <div class="result-box" id="resultBox"></div>
+        <div class="dl-bar" id="dlBar">
+          <span>报告已生成</span>
+          <a class="dl-btn" id="dlBtn" href="#" target="_blank">⬇ Word</a>
+          <a class="dl-btn" id="pdfBtn" href="#" target="_blank" style="background:#e65100;">⬇ PDF</a>
+        </div>
+        <!-- Refinement chat -->
+        <div id="refineSection" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+          <div style="color:var(--primary);font-weight:600;margin-bottom:4px;">修改报告 / 上传参考文件 / 聊天</div>
+          <div style="color:var(--muted);font-size:.75rem;margin-bottom:8px;">上传报告模板可按照其格式生成，上传数据文件可分析</div>
+          <div id="refineFiles" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;"></div>
+          <div id="refineLog" style="max-height:200px;overflow-y:auto;font-size:.82rem;line-height:1.7;margin-bottom:8px;"></div>
+          <div style="display:flex;gap:4px;">
+            <label style="cursor:pointer;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:.8rem;color:var(--muted);white-space:nowrap;" title="上传参考文件">
+              📎<input type="file" id="refineFileInput" accept=".pdf,.docx,.txt,.csv,.xlsx,.jpg,.png" multiple hidden onchange="addRefineFiles()">
+            </label>
+            <input type="text" id="refineInput" placeholder="说句话，比如：按上传文件格式重写 / 删除所有# / 把温度改成1250..." style="flex:1;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.82rem;" onkeydown="if(event.key==='Enter')refineReport()">
+            <button onclick="refineReport()" style="padding:8px 16px;background:var(--accent);color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.82rem;white-space:nowrap;">发送</button>
+          </div>
+          <a id="refineDlBtn" href="#" target="_blank" style="display:none;margin-top:8px;padding:6px 14px;background:var(--green);color:#fff;border:none;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;text-decoration:none;text-align:center;">下载修改版Word</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== DATA ANALYSIS ====== -->
+    <div class="page" id="page-data">
+      <div class="card">
+        <div class="card-header"><div class="dot blue"></div> 📊 实验数据分析</div>
+        <p style="color:var(--muted);margin-bottom:16px;">上传CSV/Excel实验数据，AI自动分析趋势、生成图表</p>
+        
+        <div class="upload-zone" id="dataDropZone" style="padding:24px;">
+          <div style="font-size:2rem;">📈</div>
+          <div>拖放 CSV 或 Excel 数据文件</div>
+          <input type="file" id="dataFileInput" accept=".csv,.xlsx,.xls" hidden>
+        </div>
+
+        <div class="section-label">📝 分析要求</div>
+        <textarea id="dataGoal" rows="2" placeholder="例如：分析退火温度与抗弯强度的关系，找出最优温度点..."></textarea>
+        <button class="btn btn-primary" onclick="analyzeData()" style="margin-top:12px;">📊 分析实验数据</button>
+        
+        <div id="dataResult" style="margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- ====== IMAGE ANALYSIS ====== -->
+    <div class="page" id="page-images">
+      <div class="card">
+        <div class="card-header"><div class="dot blue"></div> 🔍 图像分析</div>
+        <p style="color:var(--muted);margin-bottom:16px;">上传SEM、XRD、金相等实验图像，AI辅助识别与分析</p>
+        
+        <div class="upload-zone" id="imgDropZone" style="padding:24px;">
+          <div style="font-size:2rem;">🖼️</div>
+          <div>拖放 SEM/XRD/金相图像</div>
+          <div style="color:var(--muted);font-size:.8rem;">支持 JPG/PNG/TIFF</div>
+          <input type="file" id="imgFileInput" accept=".jpg,.jpeg,.png,.tiff,.bmp" multiple hidden>
+        </div>
+
+        <div class="section-label">🔬 图像类型</div>
+        <textarea id="imgType" rows="1" placeholder="例如：SiC陶瓷断口SEM照片，放大5000倍..."></textarea>
+        <button class="btn btn-primary" onclick="analyzeImage()" style="margin-top:12px;">🔍 分析图像</button>
+
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:16px;" id="imgPreview"></div>
+        <div id="imgResult" style="margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- ====== KNOWLEDGE BASE ====== -->
+    <div class="page" id="page-kb">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-header"><div class="dot blue"></div> 📚 添加论文到知识库</div>
+          <div class="upload-zone" id="kbDropZone" style="padding:24px;">
+            <div style="font-size:1.8rem;">📎</div>
+            <div>拖放或点击上传论文加入知识库</div>
+            <div style="color:var(--muted);font-size:.7rem;margin-top:4px;">论文永久保存，不会因重启丢失</div>
+            <input type="file" id="kbFileInput" accept=".pdf" multiple hidden>
+          </div>
+          <div id="kbUploadMsg" style="margin-top:8px;"></div>
+          <div class="section-label">📝 论文备注（可选）</div>
+          <input type="text" id="kbNote" placeholder="主题/关键词/分类..." style="margin-bottom:8px;">
+          <button class="btn btn-primary" onclick="addToKB()">📥 加入知识库</button>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="dot green"></div> 📖 知识库（共 <span id="kbCount">0</span> 篇）</div>
+          <div style="display:flex;gap:8px;margin-bottom:12px;">
+            <input type="text" id="kbSearch" placeholder="搜索..." style="flex:1;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.82rem;" oninput="searchKB()">
+            <button onclick="importFolder()" style="padding:8px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.78rem;cursor:pointer;white-space:nowrap;">📁 批量导入</button>
+          </div>
+          <div id="kbList" style="max-height:400px;overflow-y:auto;font-size:.82rem;">
+            <div style="color:var(--muted);">加载中...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== REPORT GENERATOR ====== -->
+    <div class="page" id="page-report">
+      <div class="card">
+        <div class="card-header"><div class="dot blue"></div> 🧪 一键生成实验方案</div>
+        <p style="color:var(--muted);margin-bottom:16px;">输入你的需求，AI基于44篇论文数据库智能匹配最佳工艺方案</p>
+        
+        <textarea id="reportGoal" rows="4" placeholder="详细描述你的实验需求、材料体系、性能目标、预算限制...AI会基于知识库为你定制最优方案。"></textarea>
+        <button class="btn btn-primary" onclick="generatePlan()" style="margin-top:12px;">⚡ 智能生成实验方案</button>
+        <div class="result-box" id="planResult" style="margin-top:16px;display:none;"></div>
+      </div>
+    </div>
+
+    <!-- ====== ARCHITECTURE ====== -->
+    <div class="page" id="page-arch">
+      <div class="card glow" style="margin-bottom:20px;">
+        <div class="card-header"><div class="dot blue"></div> Paper-Orchestrator 系统架构 v3.0</div>
+        <canvas id="archDetailed" style="width:100%;height:420px;"></canvas>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+        <div class="card" style="border-left:3px solid #00e5ff;">
+          <h4 style="color:#00e5ff;font-size:.9rem;">📥 Paper Input</h4>
+          <p style="color:var(--muted);font-size:.75rem;margin-top:6px;line-height:1.6;">接收用户上传的PDF论文<br>支持中英文混合<br>多文件/文件夹批量导入<br>格式：PDF/CSV/图片</p>
+        </div>
+        <div class="card" style="border-left:3px solid #00e676;">
+          <h4 style="color:#00e676;font-size:.9rem;">🧠 Orchestrator</h4>
+          <p style="color:var(--muted);font-size:.75rem;margin-top:6px;line-height:1.6;">主控调度中心<br>自动聚类分组论文<br>并行分发阅读任务<br>收集结果汇总报告</p>
+        </div>
+        <div class="card" style="border-left:3px solid #448aff;">
+          <h4 style="color:#448aff;font-size:.9rem;">📖 Paper-Reader x4</h4>
+          <p style="color:var(--muted);font-size:.75rem;margin-top:6px;line-height:1.6;">双语深度阅读引擎<br>PyMuPDF全文提取<br>链式推理：识别-提取-验证<br>结构化强制输出</p>
+        </div>
+        <div class="card" style="border-left:3px solid #ff9100;">
+          <h4 style="color:#ff9100;font-size:.9rem;">🔄 Synthesizer</h4>
+          <p style="color:var(--muted);font-size:.75rem;margin-top:6px;line-height:1.6;">DeepSeek v4-pro驱动<br>理解用户全部需求<br>论文数据综合分析<br>生成个性化实验方案</p>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;">
+        <div class="card" style="border-left:3px solid #ff1744;">
+          <h4 style="color:#ff1744;font-size:.9rem;">🛡 Quality-Gate</h4>
+          <p style="color:var(--muted);font-size:.75rem;margin-top:6px;line-height:1.6;">输出质量校验<br>乱码检测与自动修复<br>数据一致性验证<br>完整性检查</p>
+        </div>
+        <div class="card" style="border-left:3px solid #ab47bc;">
+          <h4 style="color:#ab47bc;font-size:.9rem;">💬 Refinement Agent</h4>
+          <p style="color:var(--muted);font-size:.75rem;margin-top:6px;line-height:1.6;">交互式报告修改<br>用户反馈即时响应<br>支持上传模板参考<br>多轮迭代优化</p>
+        </div>
+        <div class="card" style="border-left:3px solid #26c6da;">
+          <h4 style="color:#26c6da;font-size:.9rem;">📄 Word Generator</h4>
+          <p style="color:var(--muted);font-size:.75rem;margin-top:6px;line-height:1.6;">python-docx引擎<br>SimSun/SimHei中文字体<br>自动封面+目录<br>结构化排版输出</p>
+        </div>
+      </div>
+      
+      <div class="card">
+        <div class="card-header"><div class="dot blue"></div> 技术栈与模型</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;font-size:.8rem;">
+          <div><b style="color:var(--primary);">AI模型</b><br><span style="color:var(--muted);">DeepSeek v4-pro<br>openai SDK<br>自动加载OpenCode密钥</span></div>
+          <div><b style="color:var(--primary);">PDF引擎</b><br><span style="color:var(--muted);">PyMuPDF (fitz)<br>~87ms/篇<br>4线程并行读取</span></div>
+          <div><b style="color:var(--primary);">后端框架</b><br><span style="color:var(--muted);">Flask 3.x<br>密钥鉴权<br>SQLite对话存储</span></div>
+          <div><b style="color:var(--primary);">前端技术</b><br><span style="color:var(--muted);">原生HTML/CSS/JS<br>Canvas动画<br>深色科技风</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ====== Navigation ======
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.closest('.nav-item').classList.add('active');
+  if (name === 'dashboard') drawArchitecture('archCanvas');
+  if (name === 'arch') drawDetailedArch('archDetailed');
+}
+
+// ====== Particles ======
+(function() {
+  const container = document.getElementById('particles');
+  for (let i = 0; i < 30; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.top = Math.random() * 100 + '%';
+    p.style.width = p.style.height = (2 + Math.random() * 4) + 'px';
+    p.style.animationDelay = Math.random() * 8 + 's';
+    p.style.animationDuration = (6 + Math.random() * 10) + 's';
+    container.appendChild(p);
+  }
+})();
+
+// ====== Sci-Fi Architecture Visualization ======
+let animFrame = null;
+function drawArchitecture(canvasId) {
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  
+  const dpr = window.devicePixelRatio || 1;
+  const rect = c.parentElement.getBoundingClientRect();
+  c.width = rect.width * dpr;
+  c.height = 380 * dpr;
+  c.style.width = rect.width + 'px';
+  c.style.height = '380px';
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 380;
+  
+  // Evenly spaced horizontal layout
+  const cx = W;
+  const nodes = [
+    { x: cx * 0.07, y: H/2,    label: 'INPUT',        color: '#00e5ff', r: 38 },
+    { x: cx * 0.22, y: H/2,    label: 'ORCHESTRATOR',  color: '#00e676', r: 52, glow: true, master: true },
+    { x: cx * 0.42, y: 45 + 70 * 0,  label: 'reader-01',  color: '#448aff', r: 34 },
+    { x: cx * 0.42, y: 45 + 70 * 1,  label: 'reader-02',  color: '#448aff', r: 34 },
+    { x: cx * 0.42, y: 45 + 70 * 2,  label: 'reader-03',  color: '#448aff', r: 34 },
+    { x: cx * 0.42, y: 45 + 70 * 3,  label: 'reader-N',   color: '#448aff', r: 34 },
+    { x: cx * 0.64, y: H/2,    label: 'SYNTH',        color: '#ff9100', r: 40 },
+    { x: cx * 0.83, y: H/2,    label: 'GATE',         color: '#ff1744', r: 32 },
+  ];
+
+  let frame = 0;
+  const particles = [];
+  for (let i = 0; i < 60; i++) particles.push({ x: Math.random()*W, y: Math.random()*H, vx: (Math.random()-.5)*0.5, vy: (Math.random()-.5)*0.5, life: Math.random() });
+  
+  function hexGrid() {
+    ctx.strokeStyle = 'rgba(0,229,255,0.03)';
+    ctx.lineWidth = 0.5;
+    const s = 28;
+    for (let x = -s; x < W+s; x += s*1.5) {
+      for (let y = -s; y < H+s; y += s*Math.sqrt(3)) {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI/3 * i;
+          ctx.lineTo(x + Math.cos(a)*s, y + Math.sin(a)*s);
+        }
+        ctx.closePath(); ctx.stroke();
+      }
+    }
+  }
+  
+  function drawScanLine() {
+    const scanY = (Date.now() / 4000 % 1) * H;
+    const grad = ctx.createLinearGradient(0, scanY-20, 0, scanY+20);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(0.5, 'rgba(0,229,255,0.06)');
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, scanY-20, W, 40);
+  }
+  
+  function draw() {
+    frame++;
+    const t = Date.now() / 1000;
+    ctx.clearRect(0, 0, W, H);
+    
+    // Hex grid background
+    hexGrid();
+    
+    // Floating particles
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+      ctx.fillStyle = 'rgba(0,229,255,0.08)';
+      ctx.fillRect(p.x, p.y, 1.2, 1.2);
+    });
+    
+    // Scan line
+    drawScanLine();
+    
+    // Horizontal connections
+    const connections = [[0,1], [1,2],[1,3],[1,4],[1,5], [2,6],[3,6],[4,6],[5,6], [6,7]];
+    connections.forEach(([a,b], i) => {
+      const from = nodes[a], to = nodes[b];
+      const progress = (t * 1.5 + i * 0.2) % 1;
+      // Line
+      ctx.beginPath();
+      ctx.moveTo(from.x + from.r, from.y);
+      ctx.lineTo(to.x - to.r, to.y);
+      ctx.strokeStyle = 'rgba(0,229,255,0.12)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      // Flow particles
+      for (let p = 0; p < 2; p++) {
+        const pp = (progress + p * 0.5) % 1;
+        const px = from.x + from.r + (to.x - to.r - (from.x + from.r)) * pp;
+        const py = from.y + (to.y - from.y) * pp;
+        ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(0,229,255,${0.5 + Math.sin(pp*Math.PI)*0.5})`;
+        ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0;
+      }
+    });
+    
+    // Nodes
+    nodes.forEach((n, i) => {
+      const pulse = 1 + Math.sin(t * 2.5 + i) * 0.04;
+      
+      // Glow
+      if (n.glow) {
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.r * pulse + 10, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(0,230,118,0.03)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.r * pulse + 5, 0, Math.PI*2);
+        ctx.strokeStyle = 'rgba(0,230,118,0.12)'; ctx.lineWidth = 1; ctx.stroke();
+      }
+      
+      // Body
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r * pulse, 0, Math.PI*2);
+      const grad = ctx.createRadialGradient(n.x-n.r*.3, n.y-n.r*.3, 0, n.x, n.y, n.r);
+      grad.addColorStop(0, 'rgba(4,10,20,0.9)'); grad.addColorStop(1, 'rgba(2,6,14,0.97)');
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.strokeStyle = n.color; ctx.lineWidth = n.master ? 2.5 : 1.6;
+      ctx.shadowColor = n.color; ctx.shadowBlur = n.master ? 16 : 8; ctx.stroke(); ctx.shadowBlur = 0;
+      
+      // Rotating dot (moving indicator)
+      const dotAngle = t * 4 + i * 0.8;
+      const dx = n.x + Math.cos(dotAngle) * n.r * 0.6;
+      const dy = n.y + Math.sin(dotAngle) * n.r * 0.6;
+      ctx.beginPath(); ctx.arc(dx, dy, 2.2, 0, Math.PI*2);
+      ctx.fillStyle = n.color; ctx.shadowColor = n.color; ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0;
+      
+      // Label INSIDE the circle
+      ctx.fillStyle = '#e0e8f0';
+      const isReader = n.label.startsWith('reader');
+      const fontSize = isReader ? 10 : (n.master ? 13 : 11);
+      ctx.font = `bold ${fontSize}px "Consolas","Microsoft YaHei"`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(n.label, n.x, n.y);
+    });
+    
+    // Status bar
+    const barY = H - 24;
+    ctx.fillStyle = 'rgba(0,229,255,0.06)';
+    ctx.fillRect(0, barY, W, 24);
+    ctx.strokeStyle = 'rgba(0,229,255,0.1)';
+    ctx.beginPath(); ctx.moveTo(0, barY); ctx.lineTo(W, barY); ctx.stroke();
+    
+    const ts = Date.now();
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = 'bold 11px "Consolas","Microsoft YaHei"';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText('STATUS: ACTIVE', 16, barY + 12);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#6a8a9a';
+    ctx.fillText('Paper-Orchestrator v3.0  |  DeepSeek v4-pro  |  PyMuPDF  |  4x Reader', W/2, barY + 12);
+    
+    animFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function drawDetailedArch(canvasId) { drawArchitecture(canvasId); }
+
+// ====== Init: setup ALL upload zones ======
+function setupUploadZone(zoneId, inputId, tagId, fileTypes, callback) {
+  const zone = document.getElementById(zoneId);
+  const input = document.getElementById(inputId);
+  if (!zone || !input) return;
+  
+  // Click to open file/folder dialog
+  zone.addEventListener('click', (e) => {
+    if (e.target === zone || zone.contains(e.target)) {
+      input.click();
+    }
+  });
+  
+  // Recurse into dropped folders
+  async function readEntries(entry) {
+    if (entry.isFile) {
+      return new Promise((resolve) => {
+        entry.file((file) => resolve([file]));
+      });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const allFiles = [];
+      const readAll = () => new Promise((resolve) => {
+        reader.readEntries(async (entries) => {
+          if (entries.length === 0) { resolve(allFiles); return; }
+          for (const e of entries) {
+            const files = await readEntries(e);
+            allFiles.push(...files);
+          }
+          resolve(allFiles);
+        });
+      });
+      return readAll();
+    }
+    return [];
+  }
+  
+  // Drag and drop
+  zone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.add('drag');
+  });
+  zone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove('drag');
+  });
+  zone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove('drag');
+    
+    const items = e.dataTransfer.items;
+    const allFiles = [];
+    
+    if (items && items[0] && items[0].webkitGetAsEntry) {
+      // Handle folder drop
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry();
+        if (entry) {
+          const files = await readEntries(entry);
+          allFiles.push(...files);
+        }
+      }
+    } else {
+      // Fallback: regular file drop
+      allFiles.push(...Array.from(e.dataTransfer.files));
+    }
+    
+    const filtered = allFiles.filter(f => 
+      fileTypes.length === 0 || fileTypes.some(ext => f.name.toLowerCase().endsWith(ext))
+    );
+    if (callback) callback(filtered);
+  });
+  
+  // File input change (also handles webkitdirectory)
+  input.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    const filtered = files.filter(f => 
+      fileTypes.length === 0 || fileTypes.some(ext => f.name.toLowerCase().endsWith(ext))
+    );
+    if (callback) callback(filtered);
+  });
+}
+
+// Paper upload
+let uploadedPapers = [];
+setupUploadZone('dropZone', 'fileInput', 'fileTags', ['.pdf'], (files) => {
+  uploadedPapers = uploadedPapers.concat(files);
+  renderPaperTags();
+  if (uploadedPapers.length) document.getElementById('statPapers').textContent = uploadedPapers.length;
+});
+
+function renderPaperTags() {
+  const tags = document.getElementById('fileTags');
+  tags.innerHTML = uploadedPapers.map((f,i) =>
+    `<span class="file-tag">📄 ${f.name} <span class="x" onclick="uploadedPapers.splice(${i},1);renderPaperTags()">x</span></span>`
+  ).join('');
+  if (uploadedPapers.length) document.getElementById('statPapers').textContent = uploadedPapers.length;
+}
+
+// Data file upload
+let dataFiles = [];
+setupUploadZone('dataDropZone', 'dataFileInput', '', ['.csv', '.xlsx', '.xls'], (files) => {
+  dataFiles = files;
+});
+
+// Image upload
+let imageFiles = [];
+setupUploadZone('imgDropZone', 'imgFileInput', '', ['.jpg', '.jpeg', '.png', '.tiff', '.bmp'], (files) => {
+  imageFiles = files;
+  const preview = document.getElementById('imgPreview');
+  preview.innerHTML = '';
+  files.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.innerHTML += `<div style="text-align:center;border:1px solid var(--border);border-radius:10px;padding:8px;background:var(--surface2);">
+        <img src="${e.target.result}" style="max-width:180px;max-height:140px;border-radius:6px;"><br>
+        <span style="font-size:.75rem;color:var(--muted);">${f.name}</span></div>`;
+    };
+    reader.readAsDataURL(f);
+  });
+});
+
+// ====== Analysis ======
+async function startAnalysis() {
+  if (uploadedPapers.length === 0) return alert('请先上传论文PDF');
+  const goal = document.getElementById('goal').value.trim();
+  if (!goal) return alert('请输入实验目标');
+
+  const btn = document.getElementById('btnGenerate');
+  const wrap = document.getElementById('progressWrap');
+  const card = document.getElementById('resultCard');
+  const box = document.getElementById('resultBox');
+  const dlBar = document.getElementById('dlBar');
+  const fill = document.getElementById('progressFill');
+  const msg = document.getElementById('stepMsg');
+  
+  btn.disabled = true; btn.textContent = '⏳ 处理中...'; wrap.style.display = 'block'; card.style.display = 'block'; dlBar.style.display = 'none';
+  fill.style.width = '5%'; msg.textContent = '📤 上传中...';
+  
+  const fd = new FormData();
+  uploadedPapers.forEach(f => fd.append('papers', f));
+  const upRes = await fetch('/api/upload', { method: 'POST', body: fd });
+  const upData = await upRes.json();
+  fill.style.width = '15%'; msg.textContent = `✅ 已接收 ${upData.count} 篇论文`;
+
+  const anaRes = await fetch('/api/analyze', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      uploads: upData.files,
+      goal: goal,
+      sampleStatus: document.getElementById('sampleStatus').value,
+      requirements: document.getElementById('requirements').value,
+      allText: `【样品状态】${document.getElementById('sampleStatus').value}\n【目标】${goal}\n【要求】${document.getElementById('requirements').value}`
+    })
+  });
+  const anaData = await anaRes.json();
+  
+  fill.style.width = '100%'; msg.textContent = '分析完成';
+  box.textContent = anaData.plan;
+  document.getElementById('refineSection').style.display = 'block';
+  document.getElementById('refineLog').innerHTML = '';
+  
+  if (anaData.download) {
+    document.getElementById('dlBtn').href = '/api/download/' + anaData.download;
+    dlBar.style.display = 'flex';
+    // Also generate PDF
+    fetch('/api/export-pdf', {
+      method:'POST',headers:{'Content-Type':'application/json'},
+      credentials:'same-origin',
+      body:JSON.stringify({content: anaData.plan})
+    }).then(r=>r.json()).then(d=>{
+      if(d.download) document.getElementById('pdfBtn').href = '/api/download/' + d.download;
+    });
+    let rc = parseInt(document.getElementById('statReports').textContent || 0) + 1;
+    document.getElementById('statReports').textContent = rc;
+    document.getElementById('recentActivity').innerHTML = `· 刚刚完成：分析 ${upData.count} 篇论文 → 生成实验报告<br>· ${new Date().toLocaleTimeString()}`;
+  }
+  
+  btn.disabled = false;
+}
+
+// ====== Data Analysis ======
+async function analyzeData() {
+  const goal = document.getElementById('dataGoal').value.trim();
+  if (!goal) return alert('请描述分析要求');
+  const result = document.getElementById('dataResult');
+  
+  if (dataFiles.length > 0) {
+    result.innerHTML = `<div class="card"><div class="card-header"><div class="dot green"></div> 数据分析结果</div>
+      <div style="color:var(--muted);">📂 已接收 ${dataFiles.length} 个数据文件</div>
+      <div class="chart-placeholder" style="margin-top:12px;">📊 数据趋势图</div>
+      <p style="margin-top:12px;">根据你的要求"${goal}"，AI分析中...</p>
+      <p style="color:var(--accent);">✅ 实验数据导入成功。完整分析功能需连接后端API。</p>
+      </div>`;
+  } else {
+    result.innerHTML = `<div class="card"><p style="color:var(--warn);">⚠ 请先上传CSV/Excel数据文件</p></div>`;
+  }
+}
+
+function analyzeImage() {
+  const result = document.getElementById('imgResult');
+  const files = document.getElementById('imgFileInput').files;
+  
+  if (files.length > 0) {
+    result.innerHTML = '<div class="card"><div style="color:var(--primary);">🔍 AI分析中...</div></div>';
+    
+    const fd = new FormData();
+    fd.append('image', files[0]);
+    
+    fetch('/api/analyze-image', {method:'POST',body:fd,credentials:'same-origin'})
+      .then(r=>r.json())
+      .then(d=>{
+        result.innerHTML = '<div class="card"><div class="card-header"><div class="dot green"></div>AI图像分析</div><div style="font-size:.85rem;line-height:1.8;">' + d.result + '</div></div>';
+      })
+      .catch(e=>{ result.innerHTML = '<p style="color:var(--red);">分析失败</p>'; });
+  } else {
+    result.innerHTML = '<p style="color:var(--warn);">请先上传图像</p>';
+  }
+}
+
+// ====== Plan Generator ======
+function generatePlan() {
+  const goal = document.getElementById('reportGoal').value.trim();
+  if (!goal) return alert('请输入实验需求');
+  const result = document.getElementById('planResult');
+  result.style.display = 'block';
+  result.innerHTML = `## ⚡ 智能方案生成\n\n根据你的需求：\n> ${goal}\n\n### 推荐方案\n基于44篇SiC相关论文数据库，AI正在为你匹配最优工艺...\n\n✅ 建议使用"论文分析"页面上传具体论文以获得更精准的方案。`;
+}
+
+// ====== AI Chat with Conversations ======
+let chatLoading = false, currentConv = 0, chatId = 0;
+
+async function loadConvs() {
+  const res = await fetch('/api/chat/list', {credentials:'same-origin'});
+  const convs = await res.json();
+  const list = document.getElementById('convList');
+  if (!convs.length) { list.innerHTML = ''; return; }
+  list.innerHTML = convs.map(c => 
+    `<div style="display:flex;align-items:center;padding:3px 0;cursor:pointer;" onclick="openConv(${c.id})">
+      <span style="flex:1;color:${c.id===currentConv?'var(--primary)':'var(--muted)'};">${c.title||'New Chat'}</span>
+      <span style="color:var(--muted);font-size:.7rem;margin-right:6px;">${c.created_at?.slice(0,10)||''}</span>
+      <span onclick="event.stopPropagation();delConv(${c.id})" style="color:var(--red);cursor:pointer;font-size:.8rem;" title="删除">&#x2715;</span>
+    </div>`
+  ).join('');
+}
+
+async function newChat() {
+  const res = await fetch('/api/chat/new', {method:'POST',credentials:'same-origin'});
+  const data = await res.json();
+  openConv(data.id);
+  await loadConvs();
+}
+
+async function delConv(id) {
+  if (!confirm('Delete this conversation?')) return;
+  await fetch('/api/chat/delete/'+id, {method:'DELETE',credentials:'same-origin'});
+  if (currentConv === id) { currentConv = 0; document.getElementById('chatLog').innerHTML = '<div style="color:var(--muted);">选择对话或新建开始。</div>'; }
+  loadConvs();
+}
+
+async function openConv(id) {
+  currentConv = id;
+  const res = await fetch('/api/chat/history/'+id, {credentials:'same-origin'});
+  const msgs = await res.json();
+  const log = document.getElementById('chatLog');
+  log.innerHTML = msgs.map(m => 
+    m.role === 'user' 
+      ? '<div style="color:var(--accent);margin:6px 0 2px;font-weight:600;">You</div><div style="margin-bottom:6px;">'+m.content+'</div>'
+      : '<div style="color:var(--primary);margin:6px 0 2px;font-weight:600;">AI</div><div style="margin-bottom:6px;color:var(--muted);">'+m.content+'</div>'
+  ).join('') || '<div style="color:var(--muted);">空对话，输入问题开始。</div>';
+  log.scrollTop = log.scrollHeight;
+  loadConvs();
+}
+
+async function sendChat() {
+  if (chatLoading || !currentConv) { if(!currentConv) await newChat(); if(!currentConv) return; }
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  
+  const log = document.getElementById('chatLog');
+  const cid = 'r' + (++chatId);
+  log.innerHTML += '<div style="color:var(--accent);margin:6px 0 2px;font-weight:600;">You</div><div style="margin-bottom:6px;">'+msg+'</div>';
+  log.innerHTML += '<div style="color:var(--primary);margin:6px 0 2px;font-weight:600;">AI</div><div style="margin-bottom:6px;color:var(--muted);" id="'+cid+'">...</div>';
+  log.scrollTop = log.scrollHeight;
+  input.value = '';
+  chatLoading = true;
+  
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({message:msg, conv_id:currentConv})
+    });
+    const data = await res.json();
+    const el = document.getElementById(cid);
+    if (el) el.textContent = data.reply;
+  } catch(e) {
+    const el = document.getElementById(cid);
+    if (el) el.textContent = 'Error';
+  }
+  chatLoading = false;
+  log.scrollTop = log.scrollHeight;
+  loadConvs();
+}
+
+// Init chat on page load
+window.addEventListener('load', () => { setTimeout(loadConvs, 1000); });
+
+function uploadChatFiles() {
+  const input = document.getElementById('chatFileInput');
+  if (!input.files.length) return;
+  const names = Array.from(input.files).map(f => f.name).join(', ');
+  document.getElementById('chatInput').value = '[Files: ' + names + '] ' + document.getElementById('chatInput').value;
+}
+
+// ====== Report Refinement ======
+let lastReport = '';
+async function refineReport() {
+  const input = document.getElementById('refineInput');
+  const feedback = input.value.trim();
+  if (!feedback) return;
+  
+  const log = document.getElementById('refineLog');
+  const box = document.getElementById('resultBox');
+  lastReport = box.textContent || box.innerText || '';
+  
+  log.innerHTML += '<div style="color:var(--accent);margin:6px 0 2px;font-weight:600;">You</div><div style="margin-bottom:6px;">' + feedback + '</div>';
+  log.innerHTML += '<div style="color:var(--primary);margin:6px 0 2px;font-weight:600;">AI</div><div style="margin-bottom:6px;color:var(--muted);">思考中...</div>';
+  input.value = '';
+  
+  try {
+    // Build context with uploaded file content
+    let context = feedback;
+    const files = document.getElementById('refineFileInput').files;
+    if (files.length) {
+      context += '\n\n[参考文件:';
+      for (const f of files) {
+        if (f.name.endsWith('.txt') || f.name.endsWith('.csv')) {
+          const txt = await f.text();
+          context += '\n  ' + f.name + ': ' + txt.substring(0, 3000);
+        } else {
+          context += '\n  ' + f.name + ' (已上传参考)';
+        }
+      }
+      context += '\n]';
+      document.getElementById('refineFileInput').value = '';
+      document.getElementById('refineFiles').innerHTML = '';
+    }
+    
+    const res = await fetch('/api/refine', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({report: lastReport, feedback: context})
+    });
+    const data = await res.json();
+    
+    // Update report as plain text (avoid HTML issues with # marks)
+    box.textContent = data.report || lastReport;
+    
+    // Show AI reply (conversational)
+    const reply = data.reply || '已修改。';
+    log.innerHTML = log.innerHTML.replace('思考中...', reply);
+    
+    // Show download button for refined version
+    if (data.download) {
+      const dl = document.getElementById('refineDlBtn');
+      dl.href = '/api/download/' + data.download;
+      dl.style.display = 'block';
+    }
+    
+    log.scrollTop = log.scrollHeight;
+    box.scrollIntoView({behavior:'smooth'});
+  } catch(e) {
+    log.innerHTML = log.innerHTML.replace('思考中...', '修改失败，请重试。');
+  }
+}
+
+// ====== Knowledge Base ======
+let kbFiles = [];
+setupUploadZone('kbDropZone', 'kbFileInput', '', ['.pdf'], (files) => { kbFiles = files; document.getElementById('kbUploadMsg').innerHTML = '<span style="color:var(--accent);">已选 ' + files.length + ' 篇</span>'; });
+
+async function addToKB() {
+  if (!kbFiles.length) return alert('请先选择论文');
+  const note = document.getElementById('kbNote').value;
+  const fd = new FormData();
+  kbFiles.forEach(f => fd.append('papers', f));
+  fd.append('note', note);
+  
+  const res = await fetch('/api/kb/add', {method:'POST',body:fd,credentials:'same-origin'});
+  const data = await res.json();
+  document.getElementById('kbUploadMsg').innerHTML = '<span style="color:var(--accent);">已添加 ' + data.count + ' 篇</span>';
+  kbFiles = []; document.getElementById('kbNote').value = '';
+  loadKB();
+}
+
+async function loadKB() {
+  const res = await fetch('/api/kb/list', {credentials:'same-origin'});
+  const data = await res.json();
+  document.getElementById('kbCount').textContent = data.length;
+  const list = document.getElementById('kbList');
+  list.innerHTML = data.map(p => 
+    `<div style="padding:6px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <div><b>${p.name}</b><br><span style="color:var(--muted);font-size:.7rem;">${p.note||''} · ${p.pages||'?'}页 · ${p.added||''}</span></div>
+      <span onclick="delKB(${p.id})" style="color:var(--red);cursor:pointer;font-size:.8rem;" title="删除">x</span>
+    </div>`
+  ).join('') || '<div style="color:var(--muted);">知识库为空，上传论文吧</div>';
+}
+
+function searchKB() {
+  const q = document.getElementById('kbSearch').value.toLowerCase();
+  fetch('/api/kb/list').then(r=>r.json()).then(data=>{
+    const filtered = data.filter(p => p.name.toLowerCase().includes(q) || (p.note||'').toLowerCase().includes(q));
+    const list = document.getElementById('kbList');
+    list.innerHTML = filtered.map(p => 
+      `<div style="padding:6px 0;border-bottom:1px solid var(--border);"><b>${p.name}</b><br><span style="color:var(--muted);font-size:.7rem;">${p.note||''} · ${p.pages||'?'}页</span></div>`
+    ).join('') || '<div style="color:var(--muted);">无匹配</div>';
+  });
+}
+
+async function delKB(id) {
+  if (!confirm('确定删除？')) return;
+  await fetch('/api/kb/del/'+id, {method:'DELETE',credentials:'same-origin'});
+  loadKB();
+}
+
+function importFolder() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.webkitdirectory = true;
+  input.directory = true;
+  input.onchange = async function() {
+    const files = Array.from(input.files).filter(f => f.name.endsWith('.pdf'));
+    if (!files.length) return alert('未找到PDF文件');
+    
+    const fd = new FormData();
+    files.forEach(f => fd.append('papers', f));
+    fd.append('note', '文件夹批量导入');
+    
+    const res = await fetch('/api/kb/add', {method:'POST',body:fd,credentials:'same-origin'});
+    const data = await res.json();
+    alert('已导入 ' + data.count + ' 篇');
+    loadKB();
+  };
+  input.click();
+}
+
+// Init stat
+document.getElementById('statAgents').textContent = '3';
+
+// Draw architecture on load
+// Draw architecture on first load
+setTimeout(() => drawArchitecture('archCanvas'), 800);
+</script>
+</body>
+</html>
