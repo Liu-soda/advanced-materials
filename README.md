@@ -14,8 +14,6 @@ Built on **Paper-Orchestrator v3.0** multi-agent architecture at Huazhong Univer
 - 💬 Interactive refinement via chat
 - 🔍 SEM/XRD image analysis
 - 📚 Knowledge base for permanent paper storage
-- 🎨 Dark sci-fi web interface
-
 ## Quick Start
 
 ```bash
